@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { EventFormData } from '@/types/event';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EventFormProps {
   onSubmit: (data: EventFormData) => void;
@@ -15,6 +16,7 @@ interface EventFormProps {
 }
 
 const EventForm: React.FC<EventFormProps> = ({ onSubmit, isLoading = false }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState<EventFormData>({
     title: '',
     description: '',
@@ -24,7 +26,7 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, isLoading = false }) =>
     eventType: 'Meetup',
     tags: [],
     isOnline: false,
-    organizerName: '',
+    organizerName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || '',
   });
 
   const [tagInput, setTagInput] = useState('');

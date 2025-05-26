@@ -6,13 +6,12 @@ import EventCard from '@/components/EventCard';
 import EventFilters from '@/components/EventFilters';
 import EventForm from '@/components/EventForm';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { mockEvents } from '@/data/mockEvents';
-import { Event, EventFormData } from '@/types/event';
+import { useEvents } from '@/hooks/useEvents';
+import { EventFormData } from '@/types/event';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
 
 const Index = () => {
-  const [events, setEvents] = useState<Event[]>(mockEvents);
+  const { events, loading, createEvent, registerForEvent } = useEvents();
   const [searchTerm, setSearchTerm] = useState('');
   const [eventType, setEventType] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
@@ -34,53 +33,11 @@ const Index = () => {
     return matchesSearch && matchesType && matchesDate;
   });
 
-  const handleCreateEvent = (formData: EventFormData) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to create events.",
-        variant: "destructive"
-      });
-      return;
+  const handleCreateEvent = async (formData: EventFormData) => {
+    const success = await createEvent(formData);
+    if (success) {
+      setShowCreateForm(false);
     }
-
-    const newEvent: Event = {
-      id: Date.now().toString(),
-      ...formData,
-      attendees: 0,
-      createdAt: new Date().toISOString(),
-      registrationEnabled: true,
-    };
-
-    setEvents(prev => [newEvent, ...prev]);
-    setShowCreateForm(false);
-    toast({
-      title: "Event Created Successfully!",
-      description: `${newEvent.title} has been created and is now live.`,
-    });
-  };
-
-  const handleRegister = (eventId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to register for events.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setEvents(prev => prev.map(event => 
-      event.id === eventId 
-        ? { ...event, attendees: event.attendees + 1 }
-        : event
-    ));
-    
-    const event = events.find(e => e.id === eventId);
-    toast({
-      title: "Registration Successful!",
-      description: `You've successfully registered for ${event?.title}`,
-    });
   };
 
   if (showCreateForm) {
@@ -136,7 +93,7 @@ const Index = () => {
           {/* Create Event Button */}
           <div className="flex justify-between items-center mb-8">
             <h3 className="text-2xl font-bold text-gray-900">
-              {filteredEvents.length} Events Found
+              {loading ? 'Loading...' : `${filteredEvents.length} Events Found`}
             </h3>
             {user && (
               <button
@@ -149,13 +106,17 @@ const Index = () => {
           </div>
 
           {/* Events Grid */}
-          {filteredEvents.length > 0 ? (
+          {loading ? (
+            <div className="flex justify-center items-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            </div>
+          ) : filteredEvents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filteredEvents.map(event => (
                 <EventCard 
                   key={event.id} 
                   event={event} 
-                  onRegister={handleRegister}
+                  onRegister={registerForEvent}
                 />
               ))}
             </div>
@@ -164,7 +125,7 @@ const Index = () => {
               <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md mx-auto">
                 <div className="text-gray-400 mb-4">
                   <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
                   </svg>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No Events Found</h3>
