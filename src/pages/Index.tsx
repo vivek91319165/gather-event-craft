@@ -5,8 +5,10 @@ import Hero from '@/components/Hero';
 import EventCard from '@/components/EventCard';
 import EventFilters from '@/components/EventFilters';
 import EventForm from '@/components/EventForm';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { mockEvents } from '@/data/mockEvents';
 import { Event, EventFormData } from '@/types/event';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 
 const Index = () => {
@@ -15,6 +17,7 @@ const Index = () => {
   const [eventType, setEventType] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const { user } = useAuth();
 
   // Filter events based on search and filters
   const filteredEvents = events.filter(event => {
@@ -32,6 +35,15 @@ const Index = () => {
   });
 
   const handleCreateEvent = (formData: EventFormData) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to create events.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const newEvent: Event = {
       id: Date.now().toString(),
       ...formData,
@@ -49,6 +61,15 @@ const Index = () => {
   };
 
   const handleRegister = (eventId: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to register for events.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setEvents(prev => prev.map(event => 
       event.id === eventId 
         ? { ...event, attendees: event.attendees + 1 }
@@ -64,20 +85,22 @@ const Index = () => {
 
   if (showCreateForm) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="pt-20 pb-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <button 
-              onClick={() => setShowCreateForm(false)}
-              className="mb-6 text-purple-600 hover:text-purple-700 font-medium"
-            >
-              ← Back to Events
-            </button>
-            <EventForm onSubmit={handleCreateEvent} />
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gray-50">
+          <Navbar />
+          <div className="pt-20 pb-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <button 
+                onClick={() => setShowCreateForm(false)}
+                className="mb-6 text-purple-600 hover:text-purple-700 font-medium"
+              >
+                ← Back to Events
+              </button>
+              <EventForm onSubmit={handleCreateEvent} />
+            </div>
           </div>
         </div>
-      </div>
+      </ProtectedRoute>
     );
   }
 
@@ -115,12 +138,14 @@ const Index = () => {
             <h3 className="text-2xl font-bold text-gray-900">
               {filteredEvents.length} Events Found
             </h3>
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-medium transform hover:scale-105 transition-all"
-            >
-              Create New Event
-            </button>
+            {user && (
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-medium transform hover:scale-105 transition-all"
+              >
+                Create New Event
+              </button>
+            )}
           </div>
 
           {/* Events Grid */}
@@ -144,12 +169,14 @@ const Index = () => {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No Events Found</h3>
                 <p className="text-gray-600 mb-6">Try adjusting your filters or create a new event</p>
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-medium"
-                >
-                  Create First Event
-                </button>
+                {user && (
+                  <button
+                    onClick={() => setShowCreateForm(true)}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-medium"
+                  >
+                    Create First Event
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -161,12 +188,21 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h3 className="text-2xl font-bold mb-4">Ready to Create Your Event?</h3>
           <p className="text-gray-400 mb-6">Join thousands of organizers using EventHub to create memorable experiences</p>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl font-medium text-lg transform hover:scale-105 transition-all"
-          >
-            Get Started Today
-          </button>
+          {user ? (
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl font-medium text-lg transform hover:scale-105 transition-all"
+            >
+              Get Started Today
+            </button>
+          ) : (
+            <button
+              onClick={() => window.location.href = '/auth'}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl font-medium text-lg transform hover:scale-105 transition-all"
+            >
+              Sign Up to Get Started
+            </button>
+          )}
         </div>
       </footer>
     </div>

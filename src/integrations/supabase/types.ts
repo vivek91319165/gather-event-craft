@@ -9,7 +9,119 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      event_registrations: {
+        Row: {
+          event_id: string
+          id: string
+          registered_at: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          registered_at?: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          registered_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          attendees: number | null
+          created_at: string
+          description: string | null
+          end_date: string
+          event_type: string
+          id: string
+          image_url: string | null
+          is_online: boolean | null
+          location: string | null
+          max_attendees: number | null
+          organizer_id: string
+          registration_enabled: boolean | null
+          start_date: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          attendees?: number | null
+          created_at?: string
+          description?: string | null
+          end_date: string
+          event_type: string
+          id?: string
+          image_url?: string | null
+          is_online?: boolean | null
+          location?: string | null
+          max_attendees?: number | null
+          organizer_id: string
+          registration_enabled?: boolean | null
+          start_date: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          attendees?: number | null
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          event_type?: string
+          id?: string
+          image_url?: string | null
+          is_online?: boolean | null
+          location?: string | null
+          max_attendees?: number | null
+          organizer_id?: string
+          registration_enabled?: boolean | null
+          start_date?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
