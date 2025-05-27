@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Calendar, Plus, Search, User, LogOut } from 'lucide-react';
+import { Calendar, Plus, Search, User, LogOut, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,10 @@ const Navbar = () => {
 
   const handleAuthClick = () => {
     navigate('/auth');
+  };
+
+  const handleAdminClick = () => {
+    navigate('/admin');
   };
 
   return (
@@ -39,9 +43,12 @@ const Navbar = () => {
               </a>
             )}
             {user && (
-              <a href="#dashboard" className="text-gray-700 hover:text-purple-600 transition-colors">
-                Dashboard
-              </a>
+              <button 
+                onClick={handleAdminClick}
+                className="text-gray-700 hover:text-purple-600 transition-colors"
+              >
+                Admin
+              </button>
             )}
           </div>
 
@@ -56,6 +63,9 @@ const Navbar = () => {
                 <Button size="sm" className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Event
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleAdminClick}>
+                  <Shield className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   <LogOut className="h-4 w-4" />
