@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +32,16 @@ export interface UserRegistration {
   userEmail: string;
   registeredAt: string;
   isBlocked: boolean;
+}
+
+export interface BlockedUser {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  reason: string;
+  blockedAt: string;
+  blockedBy: string;
 }
 
 export const useAdmin = () => {
