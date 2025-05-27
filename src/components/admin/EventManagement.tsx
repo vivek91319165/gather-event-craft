@@ -8,22 +8,41 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { useEvents } from '@/hooks/useEvents';
 import { useAdmin, EventDetails } from '@/hooks/useAdmin';
-import { Eye, Trash2, MapPin, Calendar, Users } from 'lucide-react';
+import { Eye, Trash2, MapPin, Calendar, Users, UserX, User } from 'lucide-react';
 import { format } from 'date-fns';
+
+interface UserRegistration {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  registeredAt: string;
+  isBlocked: boolean;
+}
 
 const EventManagement = () => {
   const { events, loading } = useEvents();
-  const { fetchEventDetails, deleteEvent } = useAdmin();
+  const { fetchEventDetails, deleteEvent, blockUser, unblockUser } = useAdmin();
   const [selectedEvent, setSelectedEvent] = useState<EventDetails | null>(null);
   const [showEventDetails, setShowEventDetails] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
+  const [blockReason, setBlockReason] = useState('');
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
+  const [userToBlock, setUserToBlock] = useState<{ userId: string; userName: string } | null>(null);
+  const [eventRegistrations, setEventRegistrations] = useState<UserRegistration[]>([]);
 
   const handleViewDetails = async (eventId: string) => {
     const details = await fetchEventDetails(eventId);
     if (details) {
       setSelectedEvent(details);
+      // Convert registrations to include block status
+      const registrationsWithBlockStatus = details.registrations.map(reg => ({
+        ...reg,
+        isBlocked: false // This would need to be fetched from profiles table
+      }));
+      setEventRegistrations(registrationsWithBlockStatus);
       setShowEventDetails(true);
     }
   };
@@ -41,6 +60,34 @@ const EventManagement = () => {
         setDeleteReason('');
         setEventToDelete(null);
       }
+    }
+  };
+
+  const handleBlockClick = (userId: string, userName: string) => {
+    setUserToBlock({ userId, userName });
+    setShowBlockDialog(true);
+  };
+
+  const handleBlockConfirm = async () => {
+    if (userToBlock && blockReason.trim()) {
+      const success = await blockUser(userToBlock.userId, blockReason);
+      if (success) {
+        setShowBlockDialog(false);
+        setBlockReason('');
+        setUserToBlock(null);
+        // Refresh the event details to update block status
+        if (selectedEvent) {
+          handleViewDetails(selectedEvent.id);
+        }
+      }
+    }
+  };
+
+  const handleUnblock = async (userId: string) => {
+    const success = await unblockUser(userId);
+    if (success && selectedEvent) {
+      // Refresh the event details to update block status
+      handleViewDetails(selectedEvent.id);
     }
   };
 
@@ -136,7 +183,7 @@ const EventManagement = () => {
 
       {/* Event Details Dialog */}
       <Dialog open={showEventDetails} onOpenChange={setShowEventDetails}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl">{selectedEvent?.title}</DialogTitle>
           </DialogHeader>
@@ -197,7 +244,7 @@ const EventManagement = () => {
                 </Card>
               </div>
 
-              {/* Registrations Table */}
+              {/* Registered Users Table with Admin Actions */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">
@@ -208,19 +255,62 @@ const EventManagement = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>User</TableHead>
+                        <TableHead>User Name</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Registration Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {selectedEvent.registrations.map((registration) => (
                         <TableRow key={registration.id}>
-                          <TableCell>{registration.userName}</TableCell>
+                          <TableCell className="font-medium">
+                            {registration.userName}
+                          </TableCell>
+                          <TableCell>{registration.userEmail}</TableCell>
                           <TableCell>
                             {format(new Date(registration.registeredAt), 'PPP p')}
                           </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={registration.isBlocked ? "destructive" : "default"}
+                            >
+                              {registration.isBlocked ? "Blocked" : "Active"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {registration.isBlocked ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleUnblock(registration.userId)}
+                                >
+                                  <User className="h-4 w-4 mr-1" />
+                                  Unblock
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleBlockClick(registration.userId, registration.userName)}
+                                >
+                                  <UserX className="h-4 w-4 mr-1" />
+                                  Block
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
+                      {selectedEvent.registrations.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                            No users registered for this event
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -230,7 +320,7 @@ const EventManagement = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Event Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
@@ -264,6 +354,47 @@ const EventManagement = () => {
                 disabled={!deleteReason.trim()}
               >
                 Delete Event
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Block User Confirmation Dialog */}
+      <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Block User</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-gray-600">
+              Are you sure you want to block <span className="font-medium">{userToBlock?.userName}</span>? 
+              This will prevent them from accessing the platform.
+            </p>
+            <div>
+              <label className="text-sm font-medium text-gray-700">
+                Reason for blocking (required)
+              </label>
+              <Textarea
+                value={blockReason}
+                onChange={(e) => setBlockReason(e.target.value)}
+                placeholder="Enter reason for blocking this user..."
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowBlockDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleBlockConfirm}
+                disabled={!blockReason.trim()}
+              >
+                Block User
               </Button>
             </div>
           </div>

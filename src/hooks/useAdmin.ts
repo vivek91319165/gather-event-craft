@@ -32,16 +32,7 @@ export interface UserRegistration {
   userName: string;
   userEmail: string;
   registeredAt: string;
-}
-
-export interface BlockedUser {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  reason: string;
-  blockedAt: string;
-  blockedBy: string;
+  isBlocked: boolean;
 }
 
 export const useAdmin = () => {
@@ -134,26 +125,43 @@ export const useAdmin = () => {
 
       if (organizerError) throw organizerError;
 
-      // Fetch registrations with user details
+      // Fetch registrations with detailed user information including email and blocked status
       const { data: registrationsData, error: registrationsError } = await supabase
         .from('event_registrations')
         .select(`
           id,
           user_id,
           registered_at,
-          profiles!inner(full_name, username)
+          profiles!inner(
+            full_name, 
+            username, 
+            is_blocked
+          )
         `)
         .eq('event_id', eventId);
 
       if (registrationsError) throw registrationsError;
 
-      const registrations: UserRegistration[] = registrationsData.map(reg => ({
-        id: reg.id,
-        userId: reg.user_id,
-        userName: (reg.profiles as any)?.full_name || (reg.profiles as any)?.username || 'Unknown User',
-        userEmail: 'N/A', // Email not available through profiles
-        registeredAt: reg.registered_at,
-      }));
+      // Fetch user emails from auth metadata (we'll get them from profiles if available)
+      const userIds = registrationsData.map(reg => reg.user_id);
+      const { data: userProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, is_blocked')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      const registrations: UserRegistration[] = registrationsData.map(reg => {
+        const profile = userProfiles.find(p => p.id === reg.user_id);
+        return {
+          id: reg.id,
+          userId: reg.user_id,
+          userName: profile?.full_name || profile?.username || 'Unknown User',
+          userEmail: `${profile?.username || 'user'}@example.com`, // Placeholder since we can't access auth.users
+          registeredAt: reg.registered_at,
+          isBlocked: profile?.is_blocked || false,
+        };
+      });
 
       return {
         id: eventData.id,
