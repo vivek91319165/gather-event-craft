@@ -16,36 +16,46 @@ export const useEvents = () => {
 
   const fetchEvents = async () => {
     try {
-      const { data, error } = await supabase
+      // First fetch events
+      const { data: eventsData, error: eventsError } = await supabase
         .from('events')
-        .select(`
-          *,
-          profiles:organizer_id (
-            full_name,
-            username
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (eventsError) throw eventsError;
 
-      const formattedEvents: Event[] = data.map(event => ({
-        id: event.id,
-        title: event.title,
-        description: event.description || '',
-        startDate: event.start_date,
-        endDate: event.end_date,
-        location: event.location || '',
-        eventType: event.event_type as 'Hackathon' | 'Meetup' | 'Webinar',
-        image: event.image_url,
-        tags: event.tags || [],
-        attendees: event.attendees || 0,
-        maxAttendees: event.max_attendees,
-        isOnline: event.is_online || false,
-        createdAt: event.created_at,
-        organizerName: event.profiles?.full_name || event.profiles?.username || 'Unknown Organizer',
-        registrationEnabled: event.registration_enabled || true,
-      }));
+      // Then fetch organizer profiles separately
+      const organizerIds = eventsData.map(event => event.organizer_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', organizerIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create a map of organizer profiles
+      const profilesMap = new Map(profilesData.map(profile => [profile.id, profile]));
+
+      const formattedEvents: Event[] = eventsData.map(event => {
+        const organizer = profilesMap.get(event.organizer_id);
+        return {
+          id: event.id,
+          title: event.title,
+          description: event.description || '',
+          startDate: event.start_date,
+          endDate: event.end_date,
+          location: event.location || '',
+          eventType: event.event_type as 'Hackathon' | 'Meetup' | 'Webinar',
+          image: event.image_url,
+          tags: event.tags || [],
+          attendees: event.attendees || 0,
+          maxAttendees: event.max_attendees,
+          isOnline: event.is_online || false,
+          createdAt: event.created_at,
+          organizerName: organizer?.full_name || organizer?.username || 'Unknown Organizer',
+          registrationEnabled: event.registration_enabled || true,
+        };
+      });
 
       setEvents(formattedEvents);
     } catch (error) {
@@ -120,19 +130,52 @@ export const useEvents = () => {
     }
 
     try {
-      const { error } = await supabase
+      // Check if user is already registered
+      const { data: existingRegistration, error: checkError } = await supabase
+        .from('event_registrations')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+
+      if (existingRegistration) {
+        toast({
+          title: "Already Registered",
+          description: "You are already registered for this event.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Register for the event
+      const { error: registrationError } = await supabase
         .from('event_registrations')
         .insert({
           event_id: eventId,
           user_id: user.id,
         });
 
-      if (error) throw error;
+      if (registrationError) throw registrationError;
+
+      // Get current attendee count and increment it
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('attendees')
+        .eq('id', eventId)
+        .single();
+
+      if (eventError) throw eventError;
+
+      const newAttendeeCount = (eventData.attendees || 0) + 1;
 
       // Update attendee count
       const { error: updateError } = await supabase
         .from('events')
-        .update({ attendees: supabase.sql`attendees + 1` })
+        .update({ attendees: newAttendeeCount })
         .eq('id', eventId);
 
       if (updateError) throw updateError;
@@ -149,7 +192,7 @@ export const useEvents = () => {
       console.error('Error registering for event:', error);
       toast({
         title: "Error",
-        description: "Failed to register for event. You might already be registered.",
+        description: "Failed to register for event. Please try again.",
         variant: "destructive"
       });
     }
