@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,10 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEvents } from '@/hooks/useEvents';
 import { useAdmin, EventDetails } from '@/hooks/useAdmin';
-import { Eye, Trash2, MapPin, Calendar, Users, UserX, User } from 'lucide-react';
+import { Eye, Trash2, MapPin, Calendar, Users, UserX, User, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
+import QRScanner from './QRScanner';
 
 interface UserRegistration {
   id: string;
@@ -22,7 +23,7 @@ interface UserRegistration {
 
 const EventManagement = () => {
   const { events, loading } = useEvents();
-  const { fetchEventDetails, deleteEvent, blockUser, unblockUser } = useAdmin();
+  const { fetchEventDetails, deleteEvent, blockUser, unblockUser, getEventAttendance } = useAdmin();
   const [selectedEvent, setSelectedEvent] = useState<EventDetails | null>(null);
   const [showEventDetails, setShowEventDetails] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -32,18 +33,31 @@ const EventManagement = () => {
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
   const [userToBlock, setUserToBlock] = useState<{ userId: string; userName: string } | null>(null);
   const [eventRegistrations, setEventRegistrations] = useState<UserRegistration[]>([]);
+  const [attendanceData, setAttendanceData] = useState<any[]>([]);
 
   const handleViewDetails = async (eventId: string) => {
     const details = await fetchEventDetails(eventId);
     if (details) {
       setSelectedEvent(details);
-      // Convert registrations to include block status
       const registrationsWithBlockStatus = details.registrations.map(reg => ({
         ...reg,
-        isBlocked: false // This would need to be fetched from profiles table
+        isBlocked: false
       }));
       setEventRegistrations(registrationsWithBlockStatus);
+      
+      // Fetch attendance data
+      const attendance = await getEventAttendance(eventId);
+      setAttendanceData(attendance);
+      
       setShowEventDetails(true);
+    }
+  };
+
+  const handleAttendanceMarked = async () => {
+    if (selectedEvent) {
+      // Refresh attendance data
+      const attendance = await getEventAttendance(selectedEvent.id);
+      setAttendanceData(attendance);
     }
   };
 
@@ -189,133 +203,190 @@ const EventManagement = () => {
           </DialogHeader>
           
           {selectedEvent && (
-            <div className="space-y-6">
-              {/* Event Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="registrations">Registrations</TabsTrigger>
+                <TabsTrigger value="scanner">QR Scanner</TabsTrigger>
+                <TabsTrigger value="attendance">Attendance</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="details" className="space-y-6">
+                {/* Event Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Event Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Description</p>
+                        <p className="text-sm">{selectedEvent.description}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Location</p>
+                        <p className="text-sm">{selectedEvent.location}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Type</p>
+                        <Badge variant="outline">{selectedEvent.eventType}</Badge>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Date & Time</p>
+                        <p className="text-sm">
+                          {format(new Date(selectedEvent.startDate), 'PPP p')} - 
+                          {format(new Date(selectedEvent.endDate), 'PPP p')}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Organizer & Stats</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Organizer</p>
+                        <p className="text-sm">{selectedEvent.organizerName}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Current Attendees</p>
+                        <p className="text-sm">{selectedEvent.attendees}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Max Attendees</p>
+                        <p className="text-sm">{selectedEvent.maxAttendees || 'Unlimited'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Registration Status</p>
+                        <Badge variant="default">Open</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="registrations">
+                {/* Registered Users Table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Event Details</CardTitle>
+                    <CardTitle className="text-lg">
+                      Registered Users ({selectedEvent.registrations.length})
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Description</p>
-                      <p className="text-sm">{selectedEvent.description}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Location</p>
-                      <p className="text-sm">{selectedEvent.location}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Type</p>
-                      <Badge variant="outline">{selectedEvent.eventType}</Badge>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Date & Time</p>
-                      <p className="text-sm">
-                        {format(new Date(selectedEvent.startDate), 'PPP p')} - 
-                        {format(new Date(selectedEvent.endDate), 'PPP p')}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Organizer & Stats</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Organizer</p>
-                      <p className="text-sm">{selectedEvent.organizerName}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Current Attendees</p>
-                      <p className="text-sm">{selectedEvent.attendees}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Max Attendees</p>
-                      <p className="text-sm">{selectedEvent.maxAttendees || 'Unlimited'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Registration Status</p>
-                      <Badge variant="default">Open</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Registered Users Table with Admin Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">
-                    Registered Users ({selectedEvent.registrations.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Registration Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedEvent.registrations.map((registration) => (
-                        <TableRow key={registration.id}>
-                          <TableCell className="font-medium">
-                            {registration.userName}
-                          </TableCell>
-                          <TableCell>{registration.userEmail}</TableCell>
-                          <TableCell>
-                            {format(new Date(registration.registeredAt), 'PPP p')}
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={registration.isBlocked ? "destructive" : "default"}
-                            >
-                              {registration.isBlocked ? "Blocked" : "Active"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {registration.isBlocked ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleUnblock(registration.userId)}
-                                >
-                                  <User className="h-4 w-4 mr-1" />
-                                  Unblock
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => handleBlockClick(registration.userId, registration.userName)}
-                                >
-                                  <UserX className="h-4 w-4 mr-1" />
-                                  Block
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {selectedEvent.registrations.length === 0 && (
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                            No users registered for this event
-                          </TableCell>
+                          <TableHead>User Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Registration Date</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedEvent.registrations.map((registration) => (
+                          <TableRow key={registration.id}>
+                            <TableCell className="font-medium">
+                              {registration.userName}
+                            </TableCell>
+                            <TableCell>{registration.userEmail}</TableCell>
+                            <TableCell>
+                              {format(new Date(registration.registeredAt), 'PPP p')}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={registration.isBlocked ? "destructive" : "default"}
+                              >
+                                {registration.isBlocked ? "Blocked" : "Active"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {registration.isBlocked ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleUnblock(registration.userId)}
+                                  >
+                                    <User className="h-4 w-4 mr-1" />
+                                    Unblock
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleBlockClick(registration.userId, registration.userName)}
+                                  >
+                                    <UserX className="h-4 w-4 mr-1" />
+                                    Block
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {selectedEvent.registrations.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                              No users registered for this event
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="scanner">
+                <QRScanner 
+                  eventId={selectedEvent.id} 
+                  onAttendanceMarked={handleAttendanceMarked}
+                />
+              </TabsContent>
+
+              <TabsContent value="attendance">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      Attendance Records ({attendanceData.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User Name</TableHead>
+                          <TableHead>Check-in Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {attendanceData.map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell className="font-medium">
+                              {record.userName}
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(record.checkedInAt), 'PPP p')}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {attendanceData.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={2} className="text-center py-8 text-gray-500">
+                              No attendance records yet
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

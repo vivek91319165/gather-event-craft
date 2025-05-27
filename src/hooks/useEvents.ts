@@ -5,6 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Event, EventFormData } from '@/types/event';
 import { toast } from '@/hooks/use-toast';
 
+export interface QRCodeData {
+  id: string;
+  registrationId: string;
+  qrCodeData: string;
+  createdAt: string;
+}
+
 export const useEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +190,7 @@ export const useEvents = () => {
       const event = events.find(e => e.id === eventId);
       toast({
         title: "Registration Successful!",
-        description: `You've successfully registered for ${event?.title}`,
+        description: `You've successfully registered for ${event?.title}. Your QR code has been generated for attendance tracking.`,
       });
 
       // Refresh events list
@@ -198,11 +205,49 @@ export const useEvents = () => {
     }
   };
 
+  const fetchUserQRCode = async (eventId: string): Promise<QRCodeData | null> => {
+    if (!user) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('event_registrations')
+        .select(`
+          id,
+          registration_qr_codes (
+            id,
+            qr_code_data,
+            created_at
+          )
+        `)
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data.registration_qr_codes && data.registration_qr_codes.length > 0) {
+        const qrData = data.registration_qr_codes[0];
+        return {
+          id: qrData.id,
+          registrationId: data.id,
+          qrCodeData: qrData.qr_code_data,
+          createdAt: qrData.created_at,
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching QR code:', error);
+      return null;
+    }
+  };
+
   return {
     events,
     loading,
     createEvent,
     registerForEvent,
     refreshEvents: fetchEvents,
+    fetchUserQRCode,
   };
 };

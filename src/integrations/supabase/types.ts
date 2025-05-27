@@ -71,6 +71,35 @@ export type Database = {
         }
         Relationships: []
       }
+      event_attendance: {
+        Row: {
+          checked_in_at: string
+          checked_in_by: string
+          id: string
+          registration_id: string
+        }
+        Insert: {
+          checked_in_at?: string
+          checked_in_by: string
+          id?: string
+          registration_id: string
+        }
+        Update: {
+          checked_in_at?: string
+          checked_in_by?: string
+          id?: string
+          registration_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_attendance_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: true
+            referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_registrations: {
         Row: {
           event_id: string
@@ -189,6 +218,35 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      registration_qr_codes: {
+        Row: {
+          created_at: string
+          id: string
+          qr_code_data: string
+          registration_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          qr_code_data: string
+          registration_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          qr_code_data?: string
+          registration_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registration_qr_codes_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

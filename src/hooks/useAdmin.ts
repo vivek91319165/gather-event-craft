@@ -359,6 +359,133 @@ export const useAdmin = () => {
     }
   };
 
+  const markAttendance = async (eventId: string, qrCodeData: string) => {
+    if (!user || !isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only admins can mark attendance.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    try {
+      // First, verify the QR code belongs to a registration for this event
+      const { data: qrData, error: qrError } = await supabase
+        .from('registration_qr_codes')
+        .select(`
+          id,
+          registration_id,
+          event_registrations!inner (
+            id,
+            event_id,
+            user_id,
+            profiles!inner (
+              full_name,
+              username
+            )
+          )
+        `)
+        .eq('qr_code_data', qrCodeData)
+        .eq('event_registrations.event_id', eventId)
+        .single();
+
+      if (qrError) {
+        toast({
+          title: "Invalid QR Code",
+          description: "QR code not found or not valid for this event.",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      // Check if attendance is already marked
+      const { data: existingAttendance, error: attendanceCheckError } = await supabase
+        .from('event_attendance')
+        .select('id')
+        .eq('registration_id', qrData.registration_id)
+        .single();
+
+      if (attendanceCheckError && attendanceCheckError.code !== 'PGRST116') {
+        throw attendanceCheckError;
+      }
+
+      if (existingAttendance) {
+        toast({
+          title: "Already Checked In",
+          description: "This user has already been marked as present.",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      // Mark attendance
+      const { error: attendanceError } = await supabase
+        .from('event_attendance')
+        .insert({
+          registration_id: qrData.registration_id,
+          checked_in_by: user.id,
+        });
+
+      if (attendanceError) throw attendanceError;
+
+      const userName = qrData.event_registrations.profiles?.full_name || 
+                      qrData.event_registrations.profiles?.username || 
+                      'Unknown User';
+
+      toast({
+        title: "Attendance Marked",
+        description: `${userName} has been marked as present.`,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error marking attendance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark attendance. Please try again.",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
+  const getEventAttendance = async (eventId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('event_attendance')
+        .select(`
+          id,
+          checked_in_at,
+          registration_id,
+          event_registrations!inner (
+            user_id,
+            profiles!inner (
+              full_name,
+              username
+            )
+          )
+        `)
+        .eq('event_registrations.event_id', eventId)
+        .order('checked_in_at', { ascending: false });
+
+      if (error) throw error;
+
+      return data.map(item => ({
+        id: item.id,
+        checkedInAt: item.checked_in_at,
+        registrationId: item.registration_id,
+        userName: item.event_registrations.profiles?.full_name || 
+                 item.event_registrations.profiles?.username || 
+                 'Unknown User',
+        userId: item.event_registrations.user_id,
+      }));
+    } catch (error) {
+      console.error('Error fetching event attendance:', error);
+      return [];
+    }
+  };
+
   return {
     isAdmin,
     loading,
@@ -369,5 +496,7 @@ export const useAdmin = () => {
     fetchBlockedUsers,
     deleteEvent,
     refreshStats: fetchAdminStats,
+    markAttendance,
+    getEventAttendance,
   };
 };
