@@ -15,12 +15,23 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting payment session creation");
+    
     // Get the request body
     const { eventId, registrationId } = await req.json();
+    console.log("Request data:", { eventId, registrationId });
 
     if (!eventId || !registrationId) {
       throw new Error("Event ID and registration ID are required");
     }
+
+    // Verify Stripe secret key is available
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeSecretKey) {
+      console.error("STRIPE_SECRET_KEY environment variable is not set");
+      throw new Error("Stripe configuration error");
+    }
+    console.log("Stripe secret key found");
 
     // Create Supabase client with service role key for database operations
     const supabaseClient = createClient(
@@ -38,6 +49,7 @@ serve(async (req) => {
     if (!user?.email) {
       throw new Error("User not authenticated");
     }
+    console.log("User authenticated:", user.email);
 
     // Get event details
     const { data: event, error: eventError } = await supabaseClient
@@ -47,8 +59,10 @@ serve(async (req) => {
       .single();
 
     if (eventError || !event) {
+      console.error("Event fetch error:", eventError);
       throw new Error("Event not found");
     }
+    console.log("Event found:", event.title);
 
     if (event.is_free) {
       throw new Error("This is a free event, no payment required");
@@ -58,16 +72,20 @@ serve(async (req) => {
       throw new Error("Invalid event price");
     }
 
-    // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    // Initialize Stripe with the secret key
+    const stripe = new Stripe(stripeSecretKey, {
       apiVersion: "2023-10-16",
     });
+    console.log("Stripe initialized with secret key");
 
     // Check if a Stripe customer record exists for this user
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
+      console.log("Existing customer found:", customerId);
+    } else {
+      console.log("No existing customer found, will create new one in checkout");
     }
 
     // Create a one-time payment session
@@ -96,6 +114,7 @@ serve(async (req) => {
         userId: user.id,
       },
     });
+    console.log("Stripe session created:", session.id);
 
     // Create payment record in database
     const { error: paymentError } = await supabaseClient
@@ -113,6 +132,8 @@ serve(async (req) => {
     if (paymentError) {
       console.error("Error creating payment record:", paymentError);
       // Don't throw here, as the Stripe session was created successfully
+    } else {
+      console.log("Payment record created in database");
     }
 
     return new Response(JSON.stringify({ url: session.url }), {
