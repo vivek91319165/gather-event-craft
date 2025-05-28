@@ -17,6 +17,8 @@ export const mockEvents: Event[] = [
     createdAt: '2024-05-01T00:00:00Z',
     organizerName: 'TechCorp Events',
     registrationEnabled: true,
+    isFree: true,
+    currency: 'usd',
   },
   {
     id: '2',
@@ -33,6 +35,8 @@ export const mockEvents: Event[] = [
     createdAt: '2024-05-15T00:00:00Z',
     organizerName: 'React Community',
     registrationEnabled: true,
+    isFree: true,
+    currency: 'usd',
   },
   {
     id: '3',
@@ -48,6 +52,9 @@ export const mockEvents: Event[] = [
     createdAt: '2024-05-20T00:00:00Z',
     organizerName: 'Crypto Education Institute',
     registrationEnabled: true,
+    isFree: false,
+    price: 29.99,
+    currency: 'usd',
   },
   {
     id: '4',
@@ -64,6 +71,9 @@ export const mockEvents: Event[] = [
     createdAt: '2024-05-10T00:00:00Z',
     organizerName: 'Startup Accelerator Hub',
     registrationEnabled: true,
+    isFree: false,
+    price: 15.00,
+    currency: 'usd',
   },
   {
     id: '5',
@@ -80,6 +90,9 @@ export const mockEvents: Event[] = [
     createdAt: '2024-05-25T00:00:00Z',
     organizerName: 'CyberSafe Institute',
     registrationEnabled: true,
+    isFree: false,
+    price: 99.00,
+    currency: 'usd',
   },
   {
     id: '6',
@@ -96,5 +109,7 @@ export const mockEvents: Event[] = [
     createdAt: '2024-05-28T00:00:00Z',
     organizerName: 'GreenTech Alliance',
     registrationEnabled: true,
+    isFree: true,
+    currency: 'usd',
   }
 ];
