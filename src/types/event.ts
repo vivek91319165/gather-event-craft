@@ -15,6 +15,9 @@ export interface Event {
   createdAt: string;
   organizerName: string;
   registrationEnabled: boolean;
+  isFree: boolean;
+  price?: number;
+  currency: string;
 }
 
 export interface EventFormData {
@@ -28,4 +31,7 @@ export interface EventFormData {
   maxAttendees?: number;
   isOnline: boolean;
   organizerName: string;
+  isFree: boolean;
+  price?: number;
+  currency: string;
 }

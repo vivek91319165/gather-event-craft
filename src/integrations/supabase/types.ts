@@ -100,6 +100,63 @@ export type Database = {
           },
         ]
       }
+      event_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          event_id: string
+          id: string
+          registration_id: string
+          status: string
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          event_id: string
+          id?: string
+          registration_id: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          event_id?: string
+          id?: string
+          registration_id?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_payments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_payments_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_registrations: {
         Row: {
           event_id: string
@@ -133,15 +190,18 @@ export type Database = {
         Row: {
           attendees: number | null
           created_at: string
+          currency: string | null
           description: string | null
           end_date: string
           event_type: string
           id: string
           image_url: string | null
+          is_free: boolean
           is_online: boolean | null
           location: string | null
           max_attendees: number | null
           organizer_id: string
+          price: number | null
           registration_enabled: boolean | null
           start_date: string
           tags: string[] | null
@@ -151,15 +211,18 @@ export type Database = {
         Insert: {
           attendees?: number | null
           created_at?: string
+          currency?: string | null
           description?: string | null
           end_date: string
           event_type: string
           id?: string
           image_url?: string | null
+          is_free?: boolean
           is_online?: boolean | null
           location?: string | null
           max_attendees?: number | null
           organizer_id: string
+          price?: number | null
           registration_enabled?: boolean | null
           start_date: string
           tags?: string[] | null
@@ -169,15 +232,18 @@ export type Database = {
         Update: {
           attendees?: number | null
           created_at?: string
+          currency?: string | null
           description?: string | null
           end_date?: string
           event_type?: string
           id?: string
           image_url?: string | null
+          is_free?: boolean
           is_online?: boolean | null
           location?: string | null
           max_attendees?: number | null
           organizer_id?: string
+          price?: number | null
           registration_enabled?: boolean | null
           start_date?: string
           tags?: string[] | null

@@ -61,6 +61,9 @@ export const useEvents = () => {
           createdAt: event.created_at,
           organizerName: organizer?.full_name || organizer?.username || 'Unknown Organizer',
           registrationEnabled: event.registration_enabled || true,
+          isFree: event.is_free || true,
+          price: event.price,
+          currency: event.currency || 'usd',
         };
       });
 
@@ -101,6 +104,9 @@ export const useEvents = () => {
           max_attendees: formData.maxAttendees,
           is_online: formData.isOnline,
           organizer_id: user.id,
+          is_free: formData.isFree,
+          price: formData.isFree ? null : formData.price,
+          currency: formData.currency,
         })
         .select()
         .single();
@@ -158,26 +164,63 @@ export const useEvents = () => {
         return;
       }
 
-      // Register for the event
-      const { error: registrationError } = await supabase
-        .from('event_registrations')
-        .insert({
-          event_id: eventId,
-          user_id: user.id,
-        });
-
-      if (registrationError) throw registrationError;
-
-      // Get current attendee count and increment it
+      // Get event details to check if payment is required
       const { data: eventData, error: eventError } = await supabase
         .from('events')
-        .select('attendees')
+        .select('is_free, price, title')
         .eq('id', eventId)
         .single();
 
       if (eventError) throw eventError;
 
-      const newAttendeeCount = (eventData.attendees || 0) + 1;
+      // Register for the event
+      const { data: registration, error: registrationError } = await supabase
+        .from('event_registrations')
+        .insert({
+          event_id: eventId,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (registrationError) throw registrationError;
+
+      // If event is paid, redirect to payment
+      if (!eventData.is_free && eventData.price && eventData.price > 0) {
+        const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+          'create-event-payment',
+          {
+            body: {
+              eventId: eventId,
+              registrationId: registration.id,
+            },
+          }
+        );
+
+        if (paymentError) throw paymentError;
+
+        if (paymentData?.url) {
+          // Open Stripe checkout in a new tab
+          window.open(paymentData.url, '_blank');
+          
+          toast({
+            title: "Payment Required",
+            description: "Please complete your payment to confirm registration.",
+          });
+          return;
+        }
+      }
+
+      // For free events, complete registration immediately
+      const { data: currentEvent, error: currentEventError } = await supabase
+        .from('events')
+        .select('attendees')
+        .eq('id', eventId)
+        .single();
+
+      if (currentEventError) throw currentEventError;
+
+      const newAttendeeCount = (currentEvent.attendees || 0) + 1;
 
       // Update attendee count
       const { error: updateError } = await supabase
@@ -187,10 +230,9 @@ export const useEvents = () => {
 
       if (updateError) throw updateError;
 
-      const event = events.find(e => e.id === eventId);
       toast({
         title: "Registration Successful!",
-        description: `You've successfully registered for ${event?.title}. Your QR code has been generated for attendance tracking.`,
+        description: `You've successfully registered for ${eventData.title}. Your QR code has been generated for attendance tracking.`,
       });
 
       // Refresh events list

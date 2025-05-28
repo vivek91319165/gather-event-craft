@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Calendar, MapPin, Users, Tag } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, Tag, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +27,9 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, isLoading = false }) =>
     tags: [],
     isOnline: false,
     organizerName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || '',
+    isFree: true,
+    price: undefined,
+    currency: 'usd',
   });
 
   const [tagInput, setTagInput] = useState('');
@@ -115,6 +118,69 @@ const EventForm: React.FC<EventFormProps> = ({ onSubmit, isLoading = false }) =>
                 className="mt-2 h-12"
                 required
               />
+            </div>
+
+            {/* Pricing Section */}
+            <div className="lg:col-span-2">
+              <div className="p-4 bg-gray-50 rounded-xl space-y-4">
+                <div className="flex items-center space-x-4">
+                  <DollarSign className="h-5 w-5 text-gray-500" />
+                  <div className="flex-1">
+                    <Label className="text-lg font-semibold">Event Pricing</Label>
+                    <p className="text-sm text-gray-600">Set if this is a free or paid event</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="free-toggle" className="text-sm">Free Event</Label>
+                    <Switch
+                      id="free-toggle"
+                      checked={formData.isFree}
+                      onCheckedChange={(checked) => setFormData(prev => ({ 
+                        ...prev, 
+                        isFree: checked,
+                        price: checked ? undefined : prev.price 
+                      }))}
+                    />
+                  </div>
+                </div>
+
+                {!formData.isFree && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="price" className="text-sm font-medium">Price</Label>
+                      <Input
+                        id="price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.price || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          price: e.target.value ? parseFloat(e.target.value) : undefined 
+                        }))}
+                        placeholder="0.00"
+                        className="mt-1"
+                        required={!formData.isFree}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="currency" className="text-sm font-medium">Currency</Label>
+                      <Select 
+                        value={formData.currency} 
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="usd">USD ($)</SelectItem>
+                          <SelectItem value="eur">EUR (€)</SelectItem>
+                          <SelectItem value="gbp">GBP (£)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Start Date */}
