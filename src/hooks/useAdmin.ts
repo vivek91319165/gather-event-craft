@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -134,24 +135,15 @@ export const useAdmin = () => {
 
       if (organizerError) throw organizerError;
 
-      // Fetch registrations with detailed user information including email and blocked status
+      // Fetch registrations
       const { data: registrationsData, error: registrationsError } = await supabase
         .from('event_registrations')
-        .select(`
-          id,
-          user_id,
-          registered_at,
-          profiles!inner(
-            full_name, 
-            username, 
-            is_blocked
-          )
-        `)
+        .select('id, user_id, registered_at')
         .eq('event_id', eventId);
 
       if (registrationsError) throw registrationsError;
 
-      // Fetch user emails from auth metadata (we'll get them from profiles if available)
+      // Fetch user profiles for all registered users
       const userIds = registrationsData.map(reg => reg.user_id);
       const { data: userProfiles, error: profilesError } = await supabase
         .from('profiles')
@@ -160,8 +152,11 @@ export const useAdmin = () => {
 
       if (profilesError) throw profilesError;
 
+      // Create a map of user profiles
+      const profilesMap = new Map(userProfiles.map(profile => [profile.id, profile]));
+
       const registrations: UserRegistration[] = registrationsData.map(reg => {
-        const profile = userProfiles.find(p => p.id === reg.user_id);
+        const profile = profilesMap.get(reg.user_id);
         return {
           id: reg.id,
           userId: reg.user_id,
@@ -280,29 +275,37 @@ export const useAdmin = () => {
 
   const fetchBlockedUsers = async (): Promise<BlockedUser[]> => {
     try {
-      const { data, error } = await supabase
+      const { data: blockedData, error } = await supabase
         .from('blocked_users')
-        .select(`
-          id,
-          user_id,
-          reason,
-          blocked_at,
-          blocked_by,
-          profiles!blocked_users_user_id_fkey(full_name, username)
-        `)
+        .select('id, user_id, reason, blocked_at, blocked_by')
         .order('blocked_at', { ascending: false });
 
       if (error) throw error;
 
-      return data.map(item => ({
-        id: item.id,
-        userId: item.user_id,
-        userName: (item.profiles as any)?.full_name || (item.profiles as any)?.username || 'Unknown User',
-        userEmail: 'N/A',
-        reason: item.reason || 'No reason provided',
-        blockedAt: item.blocked_at,
-        blockedBy: item.blocked_by,
-      }));
+      // Fetch user profiles for blocked users
+      const userIds = blockedData.map(item => item.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create a map of user profiles
+      const profilesMap = new Map(profiles.map(profile => [profile.id, profile]));
+
+      return blockedData.map(item => {
+        const profile = profilesMap.get(item.user_id);
+        return {
+          id: item.id,
+          userId: item.user_id,
+          userName: profile?.full_name || profile?.username || 'Unknown User',
+          userEmail: 'N/A',
+          reason: item.reason || 'No reason provided',
+          blockedAt: item.blocked_at,
+          blockedBy: item.blocked_by,
+        };
+      });
     } catch (error) {
       console.error('Error fetching blocked users:', error);
       return [];
@@ -370,30 +373,34 @@ export const useAdmin = () => {
     }
 
     try {
-      // First, verify the QR code belongs to a registration for this event
+      // First, find the QR code and get registration info
       const { data: qrData, error: qrError } = await supabase
         .from('registration_qr_codes')
-        .select(`
-          id,
-          registration_id,
-          event_registrations!inner (
-            id,
-            event_id,
-            user_id,
-            profiles!inner (
-              full_name,
-              username
-            )
-          )
-        `)
+        .select('id, registration_id')
         .eq('qr_code_data', qrCodeData)
-        .eq('event_registrations.event_id', eventId)
         .single();
 
       if (qrError) {
         toast({
           title: "Invalid QR Code",
-          description: "QR code not found or not valid for this event.",
+          description: "QR code not found or not valid.",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      // Verify the registration belongs to this event
+      const { data: registrationData, error: regError } = await supabase
+        .from('event_registrations')
+        .select('id, event_id, user_id')
+        .eq('id', qrData.registration_id)
+        .eq('event_id', eventId)
+        .single();
+
+      if (regError) {
+        toast({
+          title: "Invalid Registration",
+          description: "QR code not valid for this event.",
           variant: "destructive"
         });
         return false;
@@ -429,9 +436,14 @@ export const useAdmin = () => {
 
       if (attendanceError) throw attendanceError;
 
-      const userName = qrData.event_registrations.profiles?.full_name || 
-                      qrData.event_registrations.profiles?.username || 
-                      'Unknown User';
+      // Get user name for the toast
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name, username')
+        .eq('id', registrationData.user_id)
+        .single();
+
+      const userName = userProfile?.full_name || userProfile?.username || 'Unknown User';
 
       toast({
         title: "Attendance Marked",
@@ -452,34 +464,51 @@ export const useAdmin = () => {
 
   const getEventAttendance = async (eventId: string) => {
     try {
-      const { data, error } = await supabase
+      // First get all registrations for this event
+      const { data: registrations, error: regError } = await supabase
+        .from('event_registrations')
+        .select('id, user_id')
+        .eq('event_id', eventId);
+
+      if (regError) throw regError;
+
+      // Get attendance records for these registrations
+      const registrationIds = registrations.map(reg => reg.id);
+      const { data: attendanceData, error: attendanceError } = await supabase
         .from('event_attendance')
-        .select(`
-          id,
-          checked_in_at,
-          registration_id,
-          event_registrations!inner (
-            user_id,
-            profiles!inner (
-              full_name,
-              username
-            )
-          )
-        `)
-        .eq('event_registrations.event_id', eventId)
+        .select('id, checked_in_at, registration_id')
+        .in('registration_id', registrationIds)
         .order('checked_in_at', { ascending: false });
 
-      if (error) throw error;
+      if (attendanceError) throw attendanceError;
 
-      return data.map(item => ({
-        id: item.id,
-        checkedInAt: item.checked_in_at,
-        registrationId: item.registration_id,
-        userName: item.event_registrations.profiles?.full_name || 
-                 item.event_registrations.profiles?.username || 
-                 'Unknown User',
-        userId: item.event_registrations.user_id,
-      }));
+      // Get user profiles for attended users
+      const attendedRegistrations = attendanceData.map(att => 
+        registrations.find(reg => reg.id === att.registration_id)
+      ).filter(Boolean);
+
+      const userIds = attendedRegistrations.map(reg => reg!.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      const profilesMap = new Map(profiles.map(profile => [profile.id, profile]));
+
+      return attendanceData.map(item => {
+        const registration = registrations.find(reg => reg.id === item.registration_id);
+        const profile = registration ? profilesMap.get(registration.user_id) : null;
+        
+        return {
+          id: item.id,
+          checkedInAt: item.checked_in_at,
+          registrationId: item.registration_id,
+          userName: profile?.full_name || profile?.username || 'Unknown User',
+          userId: registration?.user_id || '',
+        };
+      });
     } catch (error) {
       console.error('Error fetching event attendance:', error);
       return [];
