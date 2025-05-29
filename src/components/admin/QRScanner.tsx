@@ -18,9 +18,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ eventId, onAttendanceMarked }) =>
   const [qrScanner, setQrScanner] = useState<QrScanner | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [lastScanResult, setLastScanResult] = useState<string>('');
+  const [lastScanTime, setLastScanTime] = useState<number>(0);
   const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [scannedUserName, setScannedUserName] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const { markAttendance } = useAdmin();
+
+  // Cooldown period in milliseconds (3 seconds)
+  const SCAN_COOLDOWN = 3000;
 
   useEffect(() => {
     return () => {
@@ -37,10 +42,17 @@ const QRScanner: React.FC<QRScannerProps> = ({ eventId, onAttendanceMarked }) =>
       const scanner = new QrScanner(
         videoRef.current,
         async (result) => {
-          if (result.data !== lastScanResult) {
-            setLastScanResult(result.data);
-            await handleScanResult(result.data);
+          const now = Date.now();
+          
+          // Check if we're already processing or if this is a duplicate scan within cooldown period
+          if (isProcessing || 
+              (result.data === lastScanResult && (now - lastScanTime) < SCAN_COOLDOWN)) {
+            return;
           }
+
+          setLastScanResult(result.data);
+          setLastScanTime(now);
+          await handleScanResult(result.data);
         },
         {
           highlightScanRegion: true,
@@ -71,9 +83,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ eventId, onAttendanceMarked }) =>
     setIsScanning(false);
     setScanStatus('idle');
     setScannedUserName('');
+    setIsProcessing(false);
   };
 
   const handleScanResult = async (qrCodeData: string) => {
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
+    
     try {
       const result = await markAttendance(eventId, qrCodeData);
       if (result.success) {
@@ -89,14 +106,17 @@ const QRScanner: React.FC<QRScannerProps> = ({ eventId, onAttendanceMarked }) =>
         setTimeout(() => {
           setScanStatus('idle');
           setScannedUserName('');
+          setIsProcessing(false);
         }, 3000);
       } else {
         setScanStatus('error');
+        setIsProcessing(false);
         setTimeout(() => setScanStatus('idle'), 2000);
       }
     } catch (error) {
       console.error('Error marking attendance:', error);
       setScanStatus('error');
+      setIsProcessing(false);
       setTimeout(() => setScanStatus('idle'), 2000);
     }
   };
@@ -117,6 +137,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ eventId, onAttendanceMarked }) =>
             <Badge variant="destructive">
               <XCircle className="h-3 w-3 mr-1" />
               Error
+            </Badge>
+          )}
+          {isProcessing && (
+            <Badge variant="secondary">
+              Processing...
             </Badge>
           )}
         </CardTitle>

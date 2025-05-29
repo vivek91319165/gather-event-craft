@@ -237,8 +237,14 @@ export const useEvents = () => {
         description: `You've successfully registered for ${eventData.title}. Your QR code has been generated for attendance tracking.`,
       });
 
-      // Refresh events list
+      // Refresh events list to show updated attendee count
       await fetchEvents();
+      
+      // Also trigger a custom event that other components can listen to
+      window.dispatchEvent(new CustomEvent('eventRegistrationUpdated', { 
+        detail: { eventId, newAttendeeCount } 
+      }));
+      
     } catch (error) {
       console.error('Error registering for event:', error);
       toast({

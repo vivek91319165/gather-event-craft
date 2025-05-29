@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ interface UserRegistration {
 }
 
 const EventManagement = () => {
-  const { events, loading } = useEvents();
+  const { events, loading, refreshEvents } = useEvents();
   const { fetchEventDetails, deleteEvent, blockUser, unblockUser, getEventAttendance } = useAdmin();
   const [selectedEvent, setSelectedEvent] = useState<EventDetails | null>(null);
   const [showEventDetails, setShowEventDetails] = useState(false);
@@ -34,6 +35,26 @@ const EventManagement = () => {
   const [userToBlock, setUserToBlock] = useState<{ userId: string; userName: string } | null>(null);
   const [eventRegistrations, setEventRegistrations] = useState<UserRegistration[]>([]);
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
+
+  // Listen for registration updates
+  useEffect(() => {
+    const handleRegistrationUpdate = (event: CustomEvent) => {
+      console.log('Registration update received:', event.detail);
+      // Refresh events to get updated attendee counts
+      refreshEvents();
+      
+      // If the admin panel is open for this event, refresh its details
+      if (selectedEvent && selectedEvent.id === event.detail.eventId) {
+        handleViewDetails(selectedEvent.id);
+      }
+    };
+
+    window.addEventListener('eventRegistrationUpdated', handleRegistrationUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('eventRegistrationUpdated', handleRegistrationUpdate as EventListener);
+    };
+  }, [selectedEvent, refreshEvents]);
 
   const handleViewDetails = async (eventId: string) => {
     const details = await fetchEventDetails(eventId);
@@ -58,6 +79,9 @@ const EventManagement = () => {
       // Refresh attendance data
       const attendance = await getEventAttendance(selectedEvent.id);
       setAttendanceData(attendance);
+      
+      // Also refresh the event details to get updated registration count
+      await handleViewDetails(selectedEvent.id);
     }
   };
 
@@ -73,6 +97,8 @@ const EventManagement = () => {
         setShowDeleteDialog(false);
         setDeleteReason('');
         setEventToDelete(null);
+        // Refresh events list
+        await refreshEvents();
       }
     }
   };
