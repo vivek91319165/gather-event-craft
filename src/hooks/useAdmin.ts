@@ -134,44 +134,33 @@ export const useAdmin = () => {
 
       if (organizerError) throw organizerError;
 
-      // Fetch registrations with user details
+      // Fetch registrations
       const { data: registrationsData, error: registrationsError } = await supabase
         .from('event_registrations')
-        .select(`
-          id,
-          user_id,
-          registered_at,
-          profiles!inner (
-            id,
-            full_name,
-            username,
-            is_blocked
-          )
-        `)
-        .eq('event_id', eventId)
-        .order('registered_at', { ascending: false });
+        .select('id, user_id, registered_at')
+        .eq('event_id', eventId);
 
       if (registrationsError) throw registrationsError;
 
-      // Get auth user details for email addresses
+      // Fetch user profiles for all registered users including email from auth metadata
       const userIds = registrationsData.map(reg => reg.user_id);
-      
-      // Since we can't directly access auth.users, we'll use a Supabase RPC function
-      // or use the username as email fallback for now
+      const { data: userProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, is_blocked')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // For each user, we'll try to get their email from the auth.users table metadata
+      // Since we can't directly access auth.users, we'll use the username as email fallback
+      const profilesMap = new Map(userProfiles.map(profile => [profile.id, profile]));
+
       const registrations: UserRegistration[] = registrationsData.map(reg => {
-        const profile = reg.profiles;
-        // Generate email from username or use a placeholder
-        let userEmail = 'No email available';
-        
-        if (profile?.username) {
-          // If username looks like an email, use it
-          if (profile.username.includes('@')) {
-            userEmail = profile.username;
-          } else {
-            // Otherwise, assume it might be based on email prefix
-            userEmail = `${profile.username}@domain.com`;
-          }
-        }
+        const profile = profilesMap.get(reg.user_id);
+        // Create a proper email format from username or use a placeholder
+        const userEmail = profile?.username?.includes('@') 
+          ? profile.username 
+          : `${profile?.username || 'user'}@example.com`;
         
         return {
           id: reg.id,

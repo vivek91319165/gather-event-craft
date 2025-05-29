@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,19 +33,18 @@ const EventManagement = () => {
   const [blockReason, setBlockReason] = useState('');
   const [eventToDelete, setEventToDelete] = useState<string | null>(null);
   const [userToBlock, setUserToBlock] = useState<{ userId: string; userName: string } | null>(null);
+  const [eventRegistrations, setEventRegistrations] = useState<UserRegistration[]>([]);
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
 
   // Listen for registration updates
   useEffect(() => {
     const handleRegistrationUpdate = (event: CustomEvent) => {
-      console.log('Registration update received in admin panel:', event.detail);
-      
+      console.log('Registration update received:', event.detail);
       // Refresh events to get updated attendee counts
       refreshEvents();
       
       // If the admin panel is open for this event, refresh its details
       if (selectedEvent && selectedEvent.id === event.detail.eventId) {
-        console.log('Refreshing selected event details...');
         handleViewDetails(selectedEvent.id);
       }
     };
@@ -57,11 +57,14 @@ const EventManagement = () => {
   }, [selectedEvent, refreshEvents]);
 
   const handleViewDetails = async (eventId: string) => {
-    console.log('Fetching event details for:', eventId);
     const details = await fetchEventDetails(eventId);
     if (details) {
-      console.log('Event details fetched:', details);
       setSelectedEvent(details);
+      const registrationsWithBlockStatus = details.registrations.map(reg => ({
+        ...reg,
+        isBlocked: false
+      }));
+      setEventRegistrations(registrationsWithBlockStatus);
       
       // Fetch attendance data
       const attendance = await getEventAttendance(eventId);
@@ -229,9 +232,7 @@ const EventManagement = () => {
             <Tabs defaultValue="details" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="registrations">
-                  Registrations ({selectedEvent.registrations.length})
-                </TabsTrigger>
+                <TabsTrigger value="registrations">Registrations</TabsTrigger>
                 <TabsTrigger value="scanner">QR Scanner</TabsTrigger>
                 <TabsTrigger value="attendance">Attendance</TabsTrigger>
               </TabsList>
@@ -356,7 +357,7 @@ const EventManagement = () => {
                         {selectedEvent.registrations.length === 0 && (
                           <TableRow>
                             <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                              No users registered for this event yet
+                              No users registered for this event
                             </TableCell>
                           </TableRow>
                         )}
