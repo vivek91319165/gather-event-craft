@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -316,7 +315,45 @@ export const useAdmin = () => {
     if (!user || !isAdmin) return false;
 
     try {
-      // Delete event registrations first
+      // Delete in proper order to avoid foreign key constraint violations
+      
+      // 1. Delete QR codes first
+      const { data: registrations, error: fetchRegError } = await supabase
+        .from('event_registrations')
+        .select('id')
+        .eq('event_id', eventId);
+
+      if (fetchRegError) throw fetchRegError;
+
+      const registrationIds = registrations.map(reg => reg.id);
+
+      if (registrationIds.length > 0) {
+        // Delete QR codes
+        const { error: qrDeleteError } = await supabase
+          .from('registration_qr_codes')
+          .delete()
+          .in('registration_id', registrationIds);
+
+        if (qrDeleteError) throw qrDeleteError;
+
+        // Delete attendance records
+        const { error: attendanceDeleteError } = await supabase
+          .from('event_attendance')
+          .delete()
+          .in('registration_id', registrationIds);
+
+        if (attendanceDeleteError) throw attendanceDeleteError;
+
+        // Delete event payments
+        const { error: paymentsDeleteError } = await supabase
+          .from('event_payments')
+          .delete()
+          .eq('event_id', eventId);
+
+        if (paymentsDeleteError) throw paymentsDeleteError;
+      }
+
+      // 2. Delete event registrations
       const { error: registrationsError } = await supabase
         .from('event_registrations')
         .delete()
@@ -324,7 +361,7 @@ export const useAdmin = () => {
 
       if (registrationsError) throw registrationsError;
 
-      // Delete the event
+      // 3. Delete the event
       const { error: eventError } = await supabase
         .from('events')
         .delete()
@@ -332,17 +369,22 @@ export const useAdmin = () => {
 
       if (eventError) throw eventError;
 
-      // Log admin action
-      const { error: actionError } = await supabase
-        .from('admin_actions')
-        .insert({
-          admin_id: user.id,
-          action_type: 'delete_event',
-          target_event_id: eventId,
-          reason,
-        });
+      // 4. Log admin action (skip if it fails due to foreign key constraint)
+      try {
+        const { error: actionError } = await supabase
+          .from('admin_actions')
+          .insert({
+            admin_id: user.id,
+            action_type: 'delete_event',
+            reason,
+          });
 
-      if (actionError) throw actionError;
+        if (actionError) {
+          console.warn('Failed to log admin action:', actionError);
+        }
+      } catch (actionError) {
+        console.warn('Failed to log admin action:', actionError);
+      }
 
       toast({
         title: "Event Deleted",
@@ -411,9 +453,9 @@ export const useAdmin = () => {
         .from('event_attendance')
         .select('id')
         .eq('registration_id', qrData.registration_id)
-        .single();
+        .maybeSingle();
 
-      if (attendanceCheckError && attendanceCheckError.code !== 'PGRST116') {
+      if (attendanceCheckError) {
         throw attendanceCheckError;
       }
 

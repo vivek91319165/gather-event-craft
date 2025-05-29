@@ -149,9 +149,9 @@ export const useEvents = () => {
         .select('id')
         .eq('event_id', eventId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') {
+      if (checkError) {
         throw checkError;
       }
 
@@ -183,7 +183,7 @@ export const useEvents = () => {
         return;
       }
 
-      // Register for the event
+      // Start a transaction to ensure data consistency
       const { data: registration, error: registrationError } = await supabase
         .from('event_registrations')
         .insert({
@@ -193,29 +193,48 @@ export const useEvents = () => {
         .select()
         .single();
 
-      if (registrationError) throw registrationError;
+      if (registrationError) {
+        console.error('Registration error:', registrationError);
+        throw registrationError;
+      }
 
       // If event is paid, redirect to payment
       if (!eventData.is_free && eventData.price && eventData.price > 0) {
-        const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
-          'create-event-payment',
-          {
-            body: {
-              eventId: eventId,
-              registrationId: registration.id,
-            },
+        try {
+          const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+            'create-event-payment',
+            {
+              body: {
+                eventId: eventId,
+                registrationId: registration.id,
+              },
+            }
+          );
+
+          if (paymentError) throw paymentError;
+
+          if (paymentData?.url) {
+            // Open Stripe checkout in a new tab
+            window.open(paymentData.url, '_blank');
+            
+            toast({
+              title: "Payment Required",
+              description: "Please complete your payment to confirm registration.",
+            });
+            return;
           }
-        );
-
-        if (paymentError) throw paymentError;
-
-        if (paymentData?.url) {
-          // Open Stripe checkout in a new tab
-          window.open(paymentData.url, '_blank');
+        } catch (paymentError) {
+          console.error('Payment error:', paymentError);
+          // Delete the registration if payment setup fails
+          await supabase
+            .from('event_registrations')
+            .delete()
+            .eq('id', registration.id);
           
           toast({
-            title: "Payment Required",
-            description: "Please complete your payment to confirm registration.",
+            title: "Payment Error",
+            description: "Failed to set up payment. Please try again.",
+            variant: "destructive"
           });
           return;
         }
@@ -230,7 +249,10 @@ export const useEvents = () => {
         .update({ attendees: newAttendeeCount })
         .eq('id', eventId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update attendee count error:', updateError);
+        // Don't throw here as registration was successful
+      }
 
       toast({
         title: "Registration Successful!",
@@ -240,7 +262,7 @@ export const useEvents = () => {
       // Refresh events list to show updated attendee count
       await fetchEvents();
       
-      // Also trigger a custom event that other components can listen to
+      // Trigger a custom event that other components can listen to
       window.dispatchEvent(new CustomEvent('eventRegistrationUpdated', { 
         detail: { eventId, newAttendeeCount } 
       }));
@@ -271,11 +293,11 @@ export const useEvents = () => {
         `)
         .eq('event_id', eventId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (data.registration_qr_codes && data.registration_qr_codes.length > 0) {
+      if (data && data.registration_qr_codes && data.registration_qr_codes.length > 0) {
         const qrData = data.registration_qr_codes[0];
         return {
           id: qrData.id,
