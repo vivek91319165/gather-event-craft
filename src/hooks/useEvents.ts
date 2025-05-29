@@ -107,6 +107,7 @@ export const useEvents = () => {
           is_free: formData.isFree,
           price: formData.isFree ? null : formData.price,
           currency: formData.currency,
+          attendees: 0, // Initialize with 0 attendees
         })
         .select()
         .single();
@@ -143,7 +144,7 @@ export const useEvents = () => {
     }
 
     try {
-      // Check if user is already registered
+      // Start a database transaction by using a single query for consistency
       const { data: existingRegistration, error: checkError } = await supabase
         .from('event_registrations')
         .select('id')
@@ -183,7 +184,7 @@ export const useEvents = () => {
         return;
       }
 
-      // Start a transaction to ensure data consistency
+      // Register user for the event
       const { data: registration, error: registrationError } = await supabase
         .from('event_registrations')
         .insert({
@@ -198,7 +199,9 @@ export const useEvents = () => {
         throw registrationError;
       }
 
-      // If event is paid, redirect to payment
+      console.log('User registered successfully:', registration);
+
+      // Handle payment for paid events
       if (!eventData.is_free && eventData.price && eventData.price > 0) {
         try {
           const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
@@ -240,18 +243,24 @@ export const useEvents = () => {
         }
       }
 
-      // For free events, complete registration immediately
+      // For free events, update attendee count immediately
       const newAttendeeCount = (eventData.attendees || 0) + 1;
 
-      // Update attendee count
+      // Update the event's attendee count in the database
       const { error: updateError } = await supabase
         .from('events')
         .update({ attendees: newAttendeeCount })
         .eq('id', eventId);
 
       if (updateError) {
-        console.error('Update attendee count error:', updateError);
-        // Don't throw here as registration was successful
+        console.error('Error updating attendee count:', updateError);
+        toast({
+          title: "Registration Warning",
+          description: "You've been registered but attendee count may not be updated. Please refresh the page.",
+          variant: "destructive"
+        });
+      } else {
+        console.log('Attendee count updated successfully:', newAttendeeCount);
       }
 
       toast({
@@ -264,7 +273,7 @@ export const useEvents = () => {
       
       // Trigger a custom event that other components can listen to
       window.dispatchEvent(new CustomEvent('eventRegistrationUpdated', { 
-        detail: { eventId, newAttendeeCount } 
+        detail: { eventId, newAttendeeCount, userId: user.id, registration } 
       }));
       
     } catch (error) {
