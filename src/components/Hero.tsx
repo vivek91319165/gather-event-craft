@@ -4,6 +4,13 @@ import { Calendar, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Hero = () => {
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background Gradient */}
@@ -13,7 +20,7 @@ const Hero = () => {
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <div className="space-y-8">
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold text-white mb-6">
             Create
             <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               {" "}Unforgettable{" "}
@@ -21,38 +28,47 @@ const Hero = () => {
             Events
           </h1>
           
-          <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg sm:text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed px-4">
             The ultimate platform for organizing hackathons, meetups, and webinars. 
             Connect communities, spark innovation, and make every event memorable.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
-            <Button size="lg" className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-4 rounded-full transform hover:scale-105 transition-all">
-              <Calendar className="mr-2 h-5 w-5" />
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8 px-4">
+            <Button 
+              size="lg" 
+              onClick={() => scrollToSection('create')}
+              className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 rounded-full transform hover:scale-105 transition-all"
+            >
+              <Calendar className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
               Create Your Event
             </Button>
-            <Button variant="outline" size="lg" className="text-white border-white hover:bg-white hover:text-gray-900 text-lg px-8 py-4 rounded-full transform hover:scale-105 transition-all">
+            <Button 
+              variant="outline" 
+              size="lg" 
+              onClick={() => scrollToSection('events')}
+              className="w-full sm:w-auto text-white border-white hover:bg-white hover:text-gray-900 text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 rounded-full transform hover:scale-105 transition-all"
+            >
               Explore Events
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-16">
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-all">
-              <Calendar className="h-12 w-12 text-purple-400 mb-4 mx-auto" />
-              <h3 className="text-xl font-semibold text-white mb-2">Easy Event Creation</h3>
-              <p className="text-gray-300">Create professional events in minutes with our intuitive interface</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 pt-12 sm:pt-16 px-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 sm:p-6 transform hover:scale-105 transition-all">
+              <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-purple-400 mb-4 mx-auto" />
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Easy Event Creation</h3>
+              <p className="text-sm sm:text-base text-gray-300">Create professional events in minutes with our intuitive interface</p>
             </div>
             
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-all">
-              <Users className="h-12 w-12 text-blue-400 mb-4 mx-auto" />
-              <h3 className="text-xl font-semibold text-white mb-2">Community Building</h3>
-              <p className="text-gray-300">Connect like-minded individuals and grow your community</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 sm:p-6 transform hover:scale-105 transition-all">
+              <Users className="h-10 w-10 sm:h-12 sm:w-12 text-blue-400 mb-4 mx-auto" />
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Community Building</h3>
+              <p className="text-sm sm:text-base text-gray-300">Connect like-minded individuals and grow your community</p>
             </div>
             
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 transform hover:scale-105 transition-all">
-              <Zap className="h-12 w-12 text-yellow-400 mb-4 mx-auto" />
-              <h3 className="text-xl font-semibold text-white mb-2">Real-time Analytics</h3>
-              <p className="text-gray-300">Track registrations and engagement with powerful insights</p>
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 sm:p-6 transform hover:scale-105 transition-all">
+              <Zap className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-400 mb-4 mx-auto" />
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Real-time Analytics</h3>
+              <p className="text-sm sm:text-base text-gray-300">Track registrations and engagement with powerful insights</p>
             </div>
           </div>
         </div>

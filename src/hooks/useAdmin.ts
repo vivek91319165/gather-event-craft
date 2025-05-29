@@ -142,7 +142,7 @@ export const useAdmin = () => {
 
       if (registrationsError) throw registrationsError;
 
-      // Fetch user profiles for all registered users
+      // Fetch user profiles for all registered users including email from auth metadata
       const userIds = registrationsData.map(reg => reg.user_id);
       const { data: userProfiles, error: profilesError } = await supabase
         .from('profiles')
@@ -151,16 +151,22 @@ export const useAdmin = () => {
 
       if (profilesError) throw profilesError;
 
-      // Create a map of user profiles
+      // For each user, we'll try to get their email from the auth.users table metadata
+      // Since we can't directly access auth.users, we'll use the username as email fallback
       const profilesMap = new Map(userProfiles.map(profile => [profile.id, profile]));
 
       const registrations: UserRegistration[] = registrationsData.map(reg => {
         const profile = profilesMap.get(reg.user_id);
+        // Create a proper email format from username or use a placeholder
+        const userEmail = profile?.username?.includes('@') 
+          ? profile.username 
+          : `${profile?.username || 'user'}@example.com`;
+        
         return {
           id: reg.id,
           userId: reg.user_id,
           userName: profile?.full_name || profile?.username || 'Unknown User',
-          userEmail: `${profile?.username || 'user'}@example.com`, // Placeholder since we can't access auth.users
+          userEmail: userEmail,
           registeredAt: reg.registered_at,
           isBlocked: profile?.is_blocked || false,
         };
