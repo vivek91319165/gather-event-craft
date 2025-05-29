@@ -32,6 +32,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, onRegister }) => {
   };
 
   const isEventPast = new Date(event.startDate) < new Date();
+  const isEventFull = event.maxAttendees && event.attendees >= event.maxAttendees;
 
   return (
     <>
@@ -51,12 +52,19 @@ const EventCard: React.FC<EventCardProps> = ({ event, onRegister }) => {
             <Badge variant="outline" className="text-xs">
               {event.eventType}
             </Badge>
-            <Badge 
-              variant={isEventPast ? "secondary" : "default"}
-              className="text-xs"
-            >
-              {isEventPast ? 'Past' : 'Upcoming'}
-            </Badge>
+            <div className="flex gap-1">
+              <Badge 
+                variant={isEventPast ? "secondary" : "default"}
+                className="text-xs"
+              >
+                {isEventPast ? 'Past' : 'Upcoming'}
+              </Badge>
+              {isEventFull && (
+                <Badge variant="destructive" className="text-xs">
+                  Full
+                </Badge>
+              )}
+            </div>
           </div>
           <CardTitle className="text-xl font-bold text-gray-900 line-clamp-2">
             {event.title}
@@ -106,12 +114,21 @@ const EventCard: React.FC<EventCardProps> = ({ event, onRegister }) => {
           )}
 
           <div className="mt-auto space-y-2">
-            {user && event.registrationEnabled && !isEventPast && (
+            {user && event.registrationEnabled && !isEventPast && !isEventFull && (
               <Button 
                 onClick={handleRegister}
                 className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
               >
                 Register Now
+              </Button>
+            )}
+            
+            {user && event.registrationEnabled && !isEventPast && isEventFull && (
+              <Button 
+                disabled
+                className="w-full"
+              >
+                Event Full
               </Button>
             )}
             

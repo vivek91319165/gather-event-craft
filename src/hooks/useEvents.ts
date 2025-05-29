@@ -164,14 +164,24 @@ export const useEvents = () => {
         return;
       }
 
-      // Get event details to check if payment is required
+      // Get event details to check capacity and payment requirements
       const { data: eventData, error: eventError } = await supabase
         .from('events')
-        .select('is_free, price, title')
+        .select('is_free, price, title, max_attendees, attendees')
         .eq('id', eventId)
         .single();
 
       if (eventError) throw eventError;
+
+      // Check if event is at capacity
+      if (eventData.max_attendees && eventData.attendees >= eventData.max_attendees) {
+        toast({
+          title: "Event Full",
+          description: "This event has reached its maximum capacity.",
+          variant: "destructive"
+        });
+        return;
+      }
 
       // Register for the event
       const { data: registration, error: registrationError } = await supabase
@@ -212,15 +222,7 @@ export const useEvents = () => {
       }
 
       // For free events, complete registration immediately
-      const { data: currentEvent, error: currentEventError } = await supabase
-        .from('events')
-        .select('attendees')
-        .eq('id', eventId)
-        .single();
-
-      if (currentEventError) throw currentEventError;
-
-      const newAttendeeCount = (currentEvent.attendees || 0) + 1;
+      const newAttendeeCount = (eventData.attendees || 0) + 1;
 
       // Update attendee count
       const { error: updateError } = await supabase

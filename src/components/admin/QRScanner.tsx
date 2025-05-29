@@ -19,6 +19,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ eventId, onAttendanceMarked }) =>
   const [isScanning, setIsScanning] = useState(false);
   const [lastScanResult, setLastScanResult] = useState<string>('');
   const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [scannedUserName, setScannedUserName] = useState<string>('');
   const { markAttendance } = useAdmin();
 
   useEffect(() => {
@@ -69,21 +70,26 @@ const QRScanner: React.FC<QRScannerProps> = ({ eventId, onAttendanceMarked }) =>
     }
     setIsScanning(false);
     setScanStatus('idle');
+    setScannedUserName('');
   };
 
   const handleScanResult = async (qrCodeData: string) => {
     try {
-      const success = await markAttendance(eventId, qrCodeData);
-      if (success) {
+      const result = await markAttendance(eventId, qrCodeData);
+      if (result.success) {
         setScanStatus('success');
+        setScannedUserName(result.userName || 'Unknown User');
         toast({
           title: "Attendance Marked",
-          description: "User attendance has been successfully recorded.",
+          description: `${result.userName || 'User'} attendance has been successfully recorded.`,
         });
         onAttendanceMarked?.();
         
-        // Reset status after 2 seconds
-        setTimeout(() => setScanStatus('idle'), 2000);
+        // Show success popup for longer
+        setTimeout(() => {
+          setScanStatus('idle');
+          setScannedUserName('');
+        }, 3000);
       } else {
         setScanStatus('error');
         setTimeout(() => setScanStatus('idle'), 2000);
@@ -127,6 +133,29 @@ const QRScanner: React.FC<QRScannerProps> = ({ eventId, onAttendanceMarked }) =>
               <div className="text-center">
                 <Camera className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-600">Click to start scanning</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Success Popup Overlay */}
+          {scanStatus === 'success' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-green-500 bg-opacity-90 rounded-lg">
+              <div className="text-center text-white">
+                <CheckCircle className="h-16 w-16 mx-auto mb-4" />
+                <h3 className="text-xl font-bold mb-2">Attendance Marked!</h3>
+                <p className="text-lg">{scannedUserName}</p>
+                <p className="text-sm mt-2">Successfully checked in</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Error Popup Overlay */}
+          {scanStatus === 'error' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-red-500 bg-opacity-90 rounded-lg">
+              <div className="text-center text-white">
+                <XCircle className="h-16 w-16 mx-auto mb-4" />
+                <h3 className="text-xl font-bold mb-2">Scan Failed</h3>
+                <p className="text-sm">Please try again</p>
               </div>
             </div>
           )}

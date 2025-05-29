@@ -369,7 +369,7 @@ export const useAdmin = () => {
         description: "Only admins can mark attendance.",
         variant: "destructive"
       });
-      return false;
+      return { success: false };
     }
 
     try {
@@ -386,7 +386,7 @@ export const useAdmin = () => {
           description: "QR code not found or not valid.",
           variant: "destructive"
         });
-        return false;
+        return { success: false };
       }
 
       // Verify the registration belongs to this event
@@ -403,7 +403,7 @@ export const useAdmin = () => {
           description: "QR code not valid for this event.",
           variant: "destructive"
         });
-        return false;
+        return { success: false };
       }
 
       // Check if attendance is already marked
@@ -423,7 +423,7 @@ export const useAdmin = () => {
           description: "This user has already been marked as present.",
           variant: "destructive"
         });
-        return false;
+        return { success: false };
       }
 
       // Mark attendance
@@ -436,7 +436,7 @@ export const useAdmin = () => {
 
       if (attendanceError) throw attendanceError;
 
-      // Get user name for the toast
+      // Get user name for the response
       const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('full_name, username')
@@ -445,12 +445,7 @@ export const useAdmin = () => {
 
       const userName = userProfile?.full_name || userProfile?.username || 'Unknown User';
 
-      toast({
-        title: "Attendance Marked",
-        description: `${userName} has been marked as present.`,
-      });
-
-      return true;
+      return { success: true, userName };
     } catch (error) {
       console.error('Error marking attendance:', error);
       toast({
@@ -458,7 +453,7 @@ export const useAdmin = () => {
         description: "Failed to mark attendance. Please try again.",
         variant: "destructive"
       });
-      return false;
+      return { success: false };
     }
   };
 
